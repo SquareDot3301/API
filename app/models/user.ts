@@ -33,6 +33,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare permission: Permissions
 
+  @column()
+  declare userLanguage: string
+
   @column({ serializeAs: null })
   declare rememberMeToken: string | null
 

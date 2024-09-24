@@ -4,17 +4,20 @@ import Post from '#models/post'
 import { postsGetValidator, postsNewValidator } from '#validators/post'
 import type { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
+import i18nManager from '@adonisjs/i18n/services/main'
 import fs from 'fs/promises'
 import sharp from 'sharp'
 
 export default class PostsController {
     public async list({ request }: HttpContext) {
-        const data = request.validateUsing(postsGetValidator)
+        const data = await request.validateUsing(postsGetValidator)
 
-        let query = Post.query().orderBy('created_at', 'desc')
+        let query = Post.query()
+            .orderBy('created_at', 'desc')
             .preload('author', (builder) => {
-                builder.select(['username', 'pp', 'permission', 'id',])
-            }).select([
+                builder.select(['username', 'pp', 'permission', 'id'])
+            })
+            .select([
                 'id',
                 'title',
                 'slug',
@@ -26,25 +29,26 @@ export default class PostsController {
                 'tag',
             ])
 
-        if ((await data).limit && !(await data).page) {
-            query = query.limit((await data).limit)
+        if (data.users) {
+            console.log(data.users)
+            query = query.where('author', data.users)
         }
 
-        if ((await data).limit && (await data).page) {
-            query = query.paginate((await data).page, (await data).limit)
+        let posts;
+
+        if (data.limit && data.page) {
+            posts = await query.paginate(data.page, data.limit)
         }
 
-        if ((await data).users) {
-            console.log((await data).users)
-            query = query.where('author', (await data).users)
+        else if (data.limit) {
+            posts = await query.limit(data.limit)
         }
-
-        let posts = await query
 
         return posts
     }
 
     public async get({ request, response, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         const post = await Post.query()
             .preload('author')
             .preload('comments', (query) => query.limit(20))
@@ -60,12 +64,13 @@ export default class PostsController {
                 'updated_at',
                 'image',
                 'description',
-                'author'
+                'author',
+                'authorId'
             ])
             .first()
 
         if (!post) {
-            throw new APIException('Le post demandé est introuvable.')
+            throw new APIException(language.t('post.postNotFind'))
         }
 
         const user = auth.user
@@ -87,6 +92,7 @@ export default class PostsController {
 
 
     public async new({ request, auth, response }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         const data = request.validateUsing(postsNewValidator)
         const post = new Post()
 
@@ -97,23 +103,25 @@ export default class PostsController {
         if ((await data).tag) {
             post.tag = (await data).tag || ""
         }
+        post.authorId = auth.user!.id
         await post.related('author').associate(auth.user!)
         await post.save()
 
-        return response.ok("Post créé !")
+        return response.ok(language.t('post.postCreated'))
     }
 
     public async update({ request, response, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         const post = await Post.findBy('slug', request.param('slug'))
 
-        if (!post) throw new APIException('Le post demandé est introuvable.')
+        if (!post) throw new APIException(language.t('post.postNotFind'))
         if (!auth.user) throw new APIException("Vous n'êtes pas connectés !")
 
-        if (auth.user.id !== post.author) // NE PAS CHANGER
-            throw new APIException("Vous n'avez pas la permission de modifier cet article.")
+        if (auth.user.id !== post.authorId)
+            throw new APIException(language.t('post.notAuthor'))
 
 
-        const { title, content, description, image, tag } = request.only([
+        let { title, content, description, image, tag } = request.only([
             'title',
             'content',
             'description',
@@ -121,27 +129,45 @@ export default class PostsController {
             'tag',
         ])
 
-        await post.merge({ title, content, description, image, tag }).save()
+        if (image && image !== post.image) {
+            const oldImage = `posts/${post.image}`
+            const oldImagePath = app.publicPath(oldImage)
+
+            fs.unlink(oldImagePath)
+
+            post.merge({ title, content, description, image, tag })
+        } else {
+            post.merge({ title, content, description, tag })
+        }
+
+        await post.save()
 
         return response.noContent()
     }
 
     public async delete({ request, response, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         const post = await Post.findBy('slug', request.param('slug'))
-        if (!post) throw new APIException('Le post demandé est introuvable.')
+        if (!post) throw new APIException(language.t('post.postNotFind'))
         if (!auth.user) throw new APIException("Vous n'êtes pas connectés !")
 
-        if (auth.user.id !== post.author) throw new APIException("Vous n'êtes pas l'auteur de cet article.") // NE PAS CHANGER
+        if (auth.user.id !== post.authorId) throw new APIException(language.t('post.notAuthor'))
+
+        const image = `posts/${post.image}`
+        const imagePath = app.publicPath(image)
+        fs.unlink(imagePath)
+
 
         await post.delete()
         return response.noContent()
     }
 
-    public async upload({ request, response }: HttpContext) {
+    public async upload({ request, response, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         const image = request.file('image')
 
         if (!image) {
-            throw new APIException("Il n'y a aucun fichier à télécharger")
+            throw new APIException(language.t('post.notImageToUpload'))
         }
 
         const fileName = image.clientName
@@ -162,11 +188,12 @@ export default class PostsController {
 
             return response.ok({ path: resizedFileName })
         } catch (error) {
-            throw new APIException("Erreur durant l'upload")
+            throw new APIException(language.t('post.errorDuringUpload'))
         }
     }
 
-    public async show({ request, response }: HttpContext) {
+    public async show({ request, response, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         const imageName = request.param('imageName')
 
         try {
@@ -175,7 +202,7 @@ export default class PostsController {
 
             return response.download(imagePath)
         } catch (error) {
-            throw new APIException(`L'image ${error} n'a pas été trouvée...`)
+            throw new APIException(language.t('post.imageIsNotFound'))
         }
     }
 }

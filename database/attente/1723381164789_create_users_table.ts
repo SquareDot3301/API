@@ -13,6 +13,7 @@ export default class extends BaseSchema {
             table.string('pp').nullable()
             table.string('biography').nullable()
             table.string('rememberMeToken').nullable()
+            table.string('user_language')
 
             table.timestamp('created_at')
             table.timestamp('updated_at')

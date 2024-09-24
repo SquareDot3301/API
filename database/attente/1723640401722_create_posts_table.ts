@@ -19,6 +19,7 @@ export default class extends BaseSchema {
       table.string('tag')
       table.string('image')
       table.integer('like')
+      table.integer('author_id')
 
       table.timestamp('created_at')
       table.timestamp('updated_at')

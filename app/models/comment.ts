@@ -12,6 +12,9 @@ export default class Comment extends BaseModel {
   declare id: number
 
   @column()
+  declare authorId: number
+
+  @column()
   @belongsTo(() => User, { foreignKey: 'author' })
   declare author: BelongsTo<typeof User>
 

@@ -10,6 +10,7 @@ router
         router.get('/', [UsController, 'me'])
         router.delete('/', [UsController, 'delete'])
         router.put('/', [UsController, 'update'])
+        router.put('/password', [UsController, 'changePassword'])
         router.post('/upload', [UsController, 'upload'])
         router.delete('/delete', [UsController, 'deleteImage'])
       })

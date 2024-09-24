@@ -6,13 +6,17 @@ import NotFoundException from '#exceptions/not_found_exception'
 import APIException from '#exceptions/api_exception'
 import Permissions from '#config/Enums/Permission'
 import { gradeValidator } from '#validators/grade'
+import i18nManager from '@adonisjs/i18n/services/main'
+import app from '@adonisjs/core/services/app'
+import fs from 'fs/promises'
 
 export default class UsersController {
-    public async get({ params }: HttpContext) {
+    public async get({ params, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         logger.info('Fetching user by username %s', params.username)
         const user = await User.findBy('username', params.username)
         if (!user) {
-            throw new NotFoundException("User not found !")
+            throw new NotFoundException(language.t('user.userNotFound'))
         }
 
         return user.serialize({
@@ -54,32 +58,34 @@ export default class UsersController {
     }
 
     public async delete({ request, response, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         if (auth.user?.permission !== Permissions.Administrator)
-            throw new APIException('Seul un administrateur peut effectuer cette opération.')
+            throw new APIException(language.t('user.adminOnly'))
 
         const user: any = await User.findBy('username', request.param('username'))
         if (user.permission === Permissions.Administrator) {
-            throw new APIException('Vous ne pouvez pas supprimer un administrateur / modérateur !')
+            throw new APIException(language.t('user.deleteAdminOrMods'))
         }
         await user.delete()
         return response.noContent()
     }
 
     public async upgrade({ request, response, auth, params }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
         const payload = request.validateUsing(gradeValidator)
 
         const user = await User.findBy('username', params.username)
-        if (!user) throw new APIException("L'utilisateur demandé est introuvable.")
+        if (!user) throw new APIException(language.t('user.userNotFound'))
 
         if (auth.user?.permission) {
             if (auth.user?.permission < Permissions.Redactor) {
-                throw new APIException('Seul un modérateur peut effectuer cette opération.')
+                throw new APIException(language.t('user.onlyMod'))
             }
             if (
                 auth.user?.permission < Permissions.Administrator &&
                 request.param('perms') > Permissions.Redactor
             ) {
-                throw new APIException('Seul un administrateur peut effectuer cette opération.')
+                throw new APIException(language.t('user.onlyAdmin'))
             }
         }
 
@@ -88,5 +94,23 @@ export default class UsersController {
         await user.merge(user).save()
 
         return response.noContent()
+    }
+
+    public async show({ request, response, auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
+        const user = await User.findBy('username', request.param("username"))
+        if (!user) {
+            throw new NotFoundException(language.t('user.userNotFound'))
+        }
+        const imageName = request.param('id')
+
+        try {
+            const imagePath = app.publicPath(`/users/${imageName}` + '.png')
+            await fs.access(imagePath)
+
+            return response.download(imagePath)
+        } catch (error) {
+            throw new APIException(language.t('post.imageIsNotFound'))
+        }
     }
 }

@@ -10,28 +10,38 @@ import i18nManager from '@adonisjs/i18n/services/main'
 
 export default class UsController {
   public async me({ auth, response }: HttpContext) {
+    const language = i18nManager.locale(auth.user?.userLanguage || 'en')
     try {
       const user = auth.getUserOrFail()
       return response.ok(user)
     } catch (error) {
-      return response.unauthorized({ error: 'User not found' })
+      return response.unauthorized({ error: language.t('user.userNotFound') })
     }
   }
 
   public async delete({ response, auth }: HttpContext) {
     const language = i18nManager.locale(auth.user?.userLanguage || 'en')
     if (!auth.user) {
-      throw new APIException(language.t('notConnected'))
+      throw new APIException(language.t('message.notConnected'))
     }
     if (auth.user?.permission === Permissions.Administrator) {
       throw new APIException(
-        'Vous êtes un administrateur, votre compte ne peut pas être supprimé !'
+        language.t('user.adminError')
       )
     }
     const token = auth.user?.currentAccessToken.identifier
     if (!token) {
-      return response.badRequest({ message: 'Token not found' })
+      return response.badRequest({ message: language.t('auth.tokenNotFound') })
     }
+
+    try {
+      const imagePath = `users/${auth.user.id}.png`
+      await fs.unlink(app.publicPath(imagePath))
+
+    } catch (error) {
+      throw new APIException(language.t('user.errorInServer'))
+    }
+
     await auth.user!.delete()
     await User.accessTokens.delete(auth.user, token)
     return response.noContent()
@@ -39,10 +49,10 @@ export default class UsController {
 
   public async update({ request, response, auth }: HttpContext) {
     const language = i18nManager.locale(auth.user?.userLanguage || 'en')
-    const { email, username, password, biography } = request.only([
+    const { email, username, userLanguage, biography } = request.only([
       'email',
       'username',
-      'password',
+      'userLanguage',
       'biography',
     ])
 
@@ -76,16 +86,16 @@ export default class UsController {
       throw new APIException(language.t('message.username_modify_too_long'))
     }
 
-    if (password && password.length > 5) {
-      user.password = password
-    } else if (password && password.length <= 5) {
-      throw new APIException('Le mot de passe doit faire plus de 5 caractères.')
+    if (userLanguage) {
+      user.userLanguage = userLanguage
+    } else if (userLanguage && userLanguage.length <= 2) {
+      throw new APIException(language.t('message.lang_modify'))
     }
 
     if (biography && biography.length <= 200) {
       user.biography = biography
     } else if (biography.length > 200) {
-      throw new APIException('La biographie ne peut excéder 200 caractères.')
+      throw new APIException(language.t('message.biography_too_long'))
     }
 
     await auth.user!.merge(user).save()
@@ -94,10 +104,11 @@ export default class UsController {
   }
 
   public async upload({ request, response, auth }: HttpContext) {
+    const language = i18nManager.locale(auth.user?.userLanguage || 'en')
     const image = request.file('image')
 
     if (!image) {
-      throw new APIException("Il n'y a aucun fichier à télécharger")
+      throw new APIException(language.t('post.notImageToUpload'))
     }
 
     const user = await User.find(auth.user?.id)
@@ -107,7 +118,7 @@ export default class UsController {
     }
 
     if (user.permission === -1) {
-      throw new APIException('Votre compte est suspendu ! Vous ne pouvez pas faire ça.')
+      throw new APIException(language.t('message.suspended_account'))
     }
 
     const fileName = `${auth.user!.id}.png`
@@ -130,11 +141,12 @@ export default class UsController {
 
       return response.ok({ resizedImagePath })
     } catch (error) {
-      throw new APIException("Erreur durant l'upload")
+      throw new APIException(language.t('post.errorDuringUpload'))
     }
   }
 
-  public async show({ request, response }: HttpContext) {
+  public async show({ request, response, auth }: HttpContext) {
+    const language = i18nManager.locale(auth.user?.userLanguage || 'en')
     const imageName = request.param('imageName')
 
     try {
@@ -143,11 +155,12 @@ export default class UsController {
 
       return response.download(imagePath)
     } catch (error) {
-      throw new APIException(`L'image ${error} n'a pas été trouvée...`)
+      throw new APIException(language.t('post.imageIsNotFound'))
     }
   }
 
   public async deleteImage({ response, auth }: HttpContext) {
+    const language = i18nManager.locale(auth.user?.userLanguage || 'en')
     const user = auth.user
 
     if (!user) {
@@ -155,7 +168,7 @@ export default class UsController {
     }
 
     if (user.permission === -1) {
-      throw new APIException('Votre compte est suspendu ! Vous ne pouvez pas faire ça.')
+      throw new APIException(language.t('message.suspended_account'))
     }
 
     try {
@@ -165,9 +178,32 @@ export default class UsController {
       user.pp = null
       await user.save()
 
-      return response.ok('Image deleted successfully')
+      return response.ok(language.t('user.imageDeleted'))
     } catch (error) {
-      throw new APIException('Erreur dans le serveur')
+      throw new APIException(language.t('user.errorInServer'))
     }
+  }
+
+  public async changePassword({ request, auth, response }: HttpContext) {
+    const language = i18nManager.locale(auth.user?.userLanguage || 'en')
+    const { password } = request.only([
+      'password',
+    ])
+
+    const user = auth.user!
+
+    if (user.permission === -1) {
+      throw new APIException(language.t('message.suspended_account'))
+    }
+
+    if (password && password.length > 5) {
+      user.password = password
+    } else if (password && password.length <= 5) {
+      throw new APIException(language.t('message.password_too_short'))
+    }
+
+    await auth.user!.merge(user).save()
+
+    return response.noContent()
   }
 }

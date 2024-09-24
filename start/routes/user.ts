@@ -6,6 +6,7 @@ router.group(() => {
     router.get('/', [UsersController, 'list'])
     router.get('/:username', [UsersController, 'get'])
     router.get('/:username/posts', [UsersController, 'posts'])
+    router.get('/:username/image/:id', [UsersController, 'show'])
     router.group(() => {
         router.delete(':username', [UsersController, 'delete'])
         router.put('/upgrade/:username', [UsersController, 'upgrade'])

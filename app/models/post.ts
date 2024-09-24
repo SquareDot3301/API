@@ -12,13 +12,8 @@ export default class Post extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
-  // @column()
-  // declare authors: number
-
-  // @belongsTo(() => User, {
-  //   foreignKey: 'authors',
-  // })
-  // declare author: BelongsTo<typeof User>
+  @column()
+  declare authorId: number
 
   @column()
   @belongsTo(() => User, { foreignKey: 'author' })
@@ -64,28 +59,6 @@ export default class Post extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
-
-  // @computed({ serializeAs: 'has_permission' })
-  // public get hasPermission() {
-  //   const user = HttpContext.get()!.auth.user || {
-  //     id: 0,
-  //     permission: Permissions.User,
-  //   }
-
-  //   console.log('authorId:', this.author, 'user.id:', user.id)
-  //   return Number(this.author) === user.id || user.permission >= Permissions.Redactor
-  // }
-  // @computed()
-  // public get hasPermission(): boolean {
-  //   const ctx = HttpContext.get()
-  //   const user = ctx?.auth.use
-
-  //   if (!user) {
-  //     return false
-  //   }
-
-  //   return this.author === user.id
-  // }
 
   public serialize(cherryPick?: CherryPick | undefined): ModelObject {
     return {

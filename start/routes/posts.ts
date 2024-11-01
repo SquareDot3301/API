@@ -5,6 +5,7 @@ import router from "@adonisjs/core/services/router";
 
 router.group(() => {
     router.get('/', [PostsController, 'list'])
+    router.get('author/:userId', [PostsController, 'listPostsByAuthor'])
     router.get('/:slug', [PostsController, 'get'])
     router.get('/image/:imageName', [PostsController, 'show'])
     router.group(() => {

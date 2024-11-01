@@ -155,7 +155,8 @@ export default class UsController {
 
       return response.download(imagePath)
     } catch (error) {
-      throw new APIException(language.t('post.imageIsNotFound'))
+      // throw new APIException(language.t('post.imageIsNotFound'))
+      return language.t('post.imageIsNotFound')
     }
   }
 

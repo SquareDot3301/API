@@ -48,13 +48,20 @@ export default class CommentsController {
     }
 
     public async update({ request, response, auth }: HttpContext) {
+        // Big issu here, the first comment of the post is taking to be modified
         const language = i18nManager.locale(auth.user?.userLanguage || 'en')
-        const comment = await Comment.findByOrFail('id', request.param('id'))
+        const commentId = request.param('id')
+
+        const comment = await Comment.findBy("authorId", commentId)
+        console.log(comment)
         if (!comment) throw new APIException(language.t('comment.commentNotFound'))
         if (!auth.user) throw new APIException("Vous n'êtes pas connectés !")
 
-        if (auth.user.id !== comment.authorId)
+        if (auth.user && auth.user.id !== comment.authorId) {
+            console.log(`Current User ID: ${auth.user.id}, Comment Author ID: ${comment.authorId}`)
             throw new APIException(language.t('comment.notAuthor'))
+        }
+
         const { content } = request.only(['content'])
         await comment.merge({ content }).save()
 

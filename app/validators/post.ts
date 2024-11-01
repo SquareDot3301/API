@@ -20,3 +20,11 @@ export const postsNewValidator = vine.compile(
         image: vine.string().trim().minLength(3).maxLength(100)
     })
 )
+
+export const getPostsByAuthorValidator = vine.compile(
+    vine.object({
+        limit: vine.number(),
+        page: vine.number().optional(),
+        // users: vine.string()
+    })
+)

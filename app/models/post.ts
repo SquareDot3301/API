@@ -1,12 +1,13 @@
 // import { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
-import { BaseModel, beforeSave, belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
+import { afterSave, BaseModel, beforeSave, belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
 import User from './user.js'
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 import { CherryPick, ModelObject } from '@adonisjs/lucid/types/model'
 import Like from './like.js'
 import Comment from './comment.js'
 import { slugifyAdapter } from '../../utils/slugify.js'
+import RssesController from '#controllers/rsses_controller'
 
 export default class Post extends BaseModel {
   @column({ isPrimary: true })
@@ -88,5 +89,11 @@ export default class Post extends BaseModel {
         tableName: 'posts',
       })
     }
+  }
+
+  @afterSave()
+  public static async updateRssFeed() {
+    const rssController = new RssesController()
+    await rssController.generateFeed()  // Appel à une fonction qui génère le flux RSS
   }
 }

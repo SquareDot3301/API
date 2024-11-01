@@ -1,7 +1,7 @@
 import APIException from '#exceptions/api_exception'
 import Like from '#models/like'
 import Post from '#models/post'
-import { postsGetValidator, postsNewValidator } from '#validators/post'
+import { getPostsByAuthorValidator, postsGetValidator, postsNewValidator } from '#validators/post'
 import type { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
 import i18nManager from '@adonisjs/i18n/services/main'
@@ -29,9 +29,50 @@ export default class PostsController {
                 'tag',
             ])
 
+        let posts;
+
+        // User feature don't work Idk why
         if (data.users) {
             console.log(data.users)
-            query = query.where('author', data.users)
+            posts = await query.where('author', data.users)
+        }
+
+        if (data.limit && data.page) {
+            posts = await query.paginate(data.page, data.limit)
+        }
+
+        else if (data.limit) {
+            posts = await query.limit(data.limit)
+        }
+
+        return posts
+    }
+
+    public async listPostsByAuthor({ request, auth }: HttpContext) {
+        const data = await request.validateUsing(getPostsByAuthorValidator)
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
+        const target = await request.param('userId')
+
+        let query = Post.query()
+            .orderBy('created_at', 'desc')
+            .preload('author', (builder) => {
+                builder.select(['username', 'pp', 'permission', 'id'])
+            })
+            .where('author', target)
+            .select([
+                'id',
+                'title',
+                'slug',
+                'created_at',
+                'updated_at',
+                'image',
+                'description',
+                'author',
+                'tag',
+            ])
+
+        if (!query) {
+            return language.t('post.postNotFind')
         }
 
         let posts;

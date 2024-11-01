@@ -21,7 +21,7 @@ export default class UsersController {
 
         return user.serialize({
             fields: {
-                omit: ['password', 'birthdate', 'email'],
+                omit: ['password', 'email'],
             },
         })
     }
@@ -31,7 +31,7 @@ export default class UsersController {
         return (await User.all()).map((user) => {
             return user.serialize({
                 fields: {
-                    omit: ['email', 'password', 'birthdate'],
+                    omit: ['email', 'password'],
                 },
             })
         })
@@ -112,5 +112,20 @@ export default class UsersController {
         } catch (error) {
             throw new APIException(language.t('post.imageIsNotFound'))
         }
+    }
+
+    public async findAdmin({ auth }: HttpContext) {
+        const language = i18nManager.locale(auth.user?.userLanguage || 'en')
+        const admin = await User.findByOrFail("permission", 3)
+
+        if (!admin) {
+            throw new NotFoundException(language.t('user.userNotFound'))
+        }
+
+        return admin.serialize({
+            fields: {
+                omit: ['password', 'email'],
+            },
+        })
     }
 }
